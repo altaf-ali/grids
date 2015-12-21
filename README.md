@@ -1,1 +1,3 @@
-# grids
+# GRIDS
+
+![](./img/grids.png)
