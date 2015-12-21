@@ -79,14 +79,16 @@ shinyServer(function(input, output, session) {
     
     extent(spatial_data()) 
   })
-  
-  population_masked <- reactive({ 
+
+  masked_obj <- function(source_data) {
     if (is.null(input$country) || input$country == "")
       return()
     
-    cropped_obj <- crop(population_data, extent_obj())
+    cropped_obj <- crop(source_data, extent_obj())
     mask(x = cropped_obj, mask = spatial_data()) 
-  })
+  }
+
+  population_masked <- reactive(masked_obj(population_data))
   
   population_obj <- reactive({ 
     if (is.null(input$country) || input$country == "")
@@ -98,13 +100,7 @@ shinyServer(function(input, output, session) {
     aggregate(population_masked(), input$grid_scale)
   })
   
-  nightlight_masked <- reactive({ 
-    if (is.null(input$country) || input$country == "")
-      return()
-    
-    cropped_obj <- crop(nightlight_data, extent_obj())
-    mask(x = cropped_obj, mask = spatial_data()) 
-  })
+  nightlight_masked <- reactive(masked_obj(nightlight_data))
   
   nightlight_obj <- reactive({ 
     if (is.null(input$country) || input$country == "")
@@ -164,7 +160,6 @@ shinyServer(function(input, output, session) {
     
     withProgress(message = "Updating map layers", {
       leafletProxy("map", session = session) %>%
-#        clearGroup(group = "population") %>%
         addRasterImage(population_obj(), colors = population_palette(), opacity = 0.8, group = "Population Density") %>%
         addRasterImage(nightlight_obj(), colors = nightlight_palette(), opacity = 0.8, group = "Nightlight") %>%
         hideGroup("Nightlight")
@@ -183,7 +178,6 @@ shinyServer(function(input, output, session) {
                                names = names(obj)[1],
                                values = sprintf("%s, %s (min, max)", min(val, na.rm = TRUE), max(val, na.rm = TRUE))
     )
-    
     t(raster_table)
   }
   
@@ -260,8 +254,8 @@ shinyServer(function(input, output, session) {
     filename = function() {
       paste(input$country, "-", Sys.Date(), '.csv', sep='')
     },
-    content = function(con) {
-      write.csv(grid_table(), con)
+    content = function(connection) {
+      write.csv(grid_table(), connection, row.names = FALSE)
     }
   )  
 })
