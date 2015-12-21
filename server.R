@@ -175,16 +175,16 @@ shinyServer(function(input, output, session) {
     ext <- extent_obj()
     val <- values(obj)
 
-    dataframe <- data.frame(class = class(population_obj), 
-                            dimensions = sprintf("%s, %s, %s (nrow, ncol, ncell)", nrow(obj), ncol(obj), ncell(obj)),
-                            resolution = sprintf("%s, %s (x, y)", res(obj)[1], res(obj)[2]),
-                            extent = sprintf("%s, %s, %s, %s (xmin, xmax, ymin, ymax)", ext@xmin, ext@xmax, ext@ymin, ext@ymax),
-                            coord.ref = projection(obj),
-                            names = names(obj)[1],
-                            values = sprintf("%s, %s (min, max)", min(val, na.rm = TRUE), max(val, na.rm = TRUE))
+    raster_table <- data.frame(class = class(population_obj), 
+                               dimensions = sprintf("%s, %s, %s (nrow, ncol, ncell)", nrow(obj), ncol(obj), ncell(obj)),
+                               resolution = sprintf("%s, %s (x, y)", res(obj)[1], res(obj)[2]),
+                               extent = sprintf("%s, %s, %s, %s (xmin, xmax, ymin, ymax)", ext@xmin, ext@xmax, ext@ymin, ext@ymax),
+                               coord.ref = projection(obj),
+                               names = names(obj)[1],
+                               values = sprintf("%s, %s (min, max)", min(val, na.rm = TRUE), max(val, na.rm = TRUE))
     )
     
-    t(dataframe)
+    t(raster_table)
   }
   
   output$raster <- renderTable({
@@ -217,7 +217,7 @@ shinyServer(function(input, output, session) {
     population_obj <- setValues(population_obj, seq_along(population_obj))
    
     grids <- rasterToPolygons(population_obj)
-    grids@data$grid_id = seq_along(population_obj)
+    grids@data$grid_id <- seq_along(population_obj)
     grids@data$population_density <- population_obj_values
     grids@data$nightlight <- values(nightlight_obj())
    
@@ -252,8 +252,7 @@ shinyServer(function(input, output, session) {
       scale_numeric("x", nice = TRUE)  %>%
       add_axis("y", title = "Nightlight") %>%
       scale_numeric("y", nice = TRUE)  %>%
-      layer_points(stroke := "black", size = 0.2, fill = ~group) #%>%
-      #set_options(height = "auto", width = "auto")
+      layer_points(stroke := "black", size = 0.2, fill = ~group) 
   }) %>%
   bind_shiny("plot")
   
