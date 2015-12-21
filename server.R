@@ -17,7 +17,7 @@ library(dplyr)
 
 Default_Country <- "AFG"
 Working_Directory <- "~/Projects/koala"
-Initial_Zoom <- 6
+Zoom_Level <- 6
 
 shinyServer(function(input, output, session) {
   
@@ -59,54 +59,44 @@ shinyServer(function(input, output, session) {
   population_palette <- function() { "OrRd" }
   nightlight_palette <- function() { "Blues" }
   
-  spatial_data <- reactive({ 
-    if (is.null(input$country) || input$country == "")
-      return()
-    
-    subset(countries, iso_a3 == input$country)
-  })
+  spatial_data <- function(country) { subset(countries, iso_a3 == country) }
   
   country_name <- reactive({
     if (is.null(input$country) || input$country == "")
       return("")
     
-    sprintf("%s (%s)", spatial_data()$name, input$country)
+    sprintf("%s (%s)", spatial_data(input$country)$name, input$country)
   })  
   
   extent_obj <- reactive({ 
     if (is.null(input$country) || input$country == "")
       return()
     
-    extent(spatial_data()) 
+    extent(spatial_data(input$country)) 
   })
 
   masked_obj <- function(source_data) {
-    if (is.null(input$country) || input$country == "")
-      return()
-    
     cropped_obj <- crop(source_data, extent_obj())
-    mask(x = cropped_obj, mask = spatial_data()) 
+    mask(x = cropped_obj, mask = spatial_data(input$country)) 
   }
 
-  population_masked <- reactive(masked_obj(population_data))
-  
   population_obj <- reactive({ 
     if (is.null(input$country) || input$country == "")
       return()
     
-    if (input$grid_scale == 1)
-      return(population_masked())
+    population_masked <- masked_obj(population_data)
     
-    aggregate(population_masked(), input$grid_scale)
+    if (input$grid_scale == 1)
+      return(population_masked)
+    
+    aggregate(population_masked, input$grid_scale)
   })
-  
-  nightlight_masked <- reactive(masked_obj(nightlight_data))
   
   nightlight_obj <- reactive({ 
     if (is.null(input$country) || input$country == "")
       return()
     
-    resample(nightlight_masked(), population_obj())
+    resample(masked_obj(nightlight_data), population_obj())
   })
   
   groups_obj <- reactive({
@@ -132,7 +122,7 @@ shinyServer(function(input, output, session) {
         attribution = 'Maps by <a href="http://www.mapbox.com/">Mapbox</a>'
       ) %>%
       addPolygons(data = countries, layerId = ~iso_a3, weight = 0, fillColor = "transparent") %>%
-      setView(lng = center[1], lat =  center[2], zoom = Initial_Zoom) %>%
+      setView(lng = center[1], lat =  center[2], zoom = Zoom_Level) %>%
       addLayersControl(
         baseGroups = c("Population Density", "Nightlight"),
         options = layersControlOptions(collapsed = TRUE)
@@ -147,14 +137,15 @@ shinyServer(function(input, output, session) {
   observeEvent(input$map_shape_click, { 
     event <- input$map_shape_click    
     
-    if(is.null(event))
+    if (!input$map_click || is.null(event))
       return()
     
     v$country <- event$id
+    
     updateSelectInput(session, "country", selected = v$country)
   })
   
-  observe({
+  observeEvent(input$country, {
     if (is.null(input$country) || input$country == "")
       return()
     
@@ -221,6 +212,7 @@ shinyServer(function(input, output, session) {
     groups_list <- lapply(seq_along(overlays), function(i) {
       data.frame(overlays[[i]], group_id = groups@data$groupid[i])
     })
+    
     dplyr::bind_rows(groups_list) %>%
       dplyr::mutate(group = factor(group_id, levels = groups@data$groupid, labels = groups@data$group)) %>%
       dplyr::select(grid_id, group, group_id, population_density, nightlight)

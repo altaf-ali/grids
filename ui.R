@@ -19,6 +19,7 @@ dashboard_sidebar <- dashboardSidebar(
     menuItem("Home", tabName = "menuitem_main", icon = icon("dashboard")),
     hr(),
     selectInput("country", label = "Country", choices = NULL),
+    checkboxInput("map_click", label = "Clickable Map", value = FALSE),
     sliderInput("grid_scale", "Grid Scale", min = 1, max = 10, value = 1),
     HTML("<footer>"),
     box(
