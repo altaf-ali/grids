@@ -13,9 +13,10 @@ library(ggvis)
 library(geosphere)
 library(countrycode)
 library(DT)
+library(stringr)
 library(dplyr)
 
-Default_Country <- "AFG"
+Default_Country <- "CHE"
 Working_Directory <- "~/Projects/koala"
 Zoom_Level <- 6
 
@@ -54,8 +55,34 @@ shinyServer(function(input, output, session) {
   population_groups <- readOGR("./datasets/geoEPR/2014", "GeoEPR-2014")
   
   progress$set(message = "Loading Night Lights dataset")
-  nightlight_data <- raster("./datasets/noaa/F152000.v4/F152000.v4b_web.stable_lights.avg_vis.tif")
+
+  nightlight_data <- c()
   
+  load_nightlight_data <- function(nightlight_root) {
+    folders <- data.frame(
+      year = NA,
+      satellite = NA,
+      name = list.dirs(nightlight_root, recursive = FALSE, full.names = TRUE))
+    
+    folders <- folders %>%
+      mutate(basename = str_extract(name, "F\\d{6}.v4"),
+             satellite = substr(basename, 2, 3),
+             year = substr(basename, 4, 7)) %>%
+      arrange(year) %>%
+      group_by(year) %>%
+      filter(rank(satellite) == max(rank(satellite)))
+    
+    #folders <- folders[1:1,]
+    for (folder in folders$name) {
+      files <- list.files(path = folder, pattern = sprintf("%s._web.stable_lights.avg_vis.tif", basename(folder)), full.names = TRUE)
+      for (f in files) {
+        nightlight_data <<- c(raster(f), nightlight_data)
+      }
+    }
+  }
+  
+  load_nightlight_data("./datasets/noaa")
+
   population_palette <- function() { "OrRd" }
   nightlight_palette <- function() { "Blues" }
   
@@ -96,7 +123,7 @@ shinyServer(function(input, output, session) {
     if (is.null(input$country) || input$country == "")
       return()
     
-    resample(masked_obj(nightlight_data), population_obj())
+    resample(masked_obj(nightlight_data[[input$year - 1992 + 1]]), population_obj())
   })
   
   groups_obj <- reactive({
@@ -228,7 +255,9 @@ shinyServer(function(input, output, session) {
   })
   
   reactive({
-    grid_table %>%
+    ylabel <- sprintf("Nightlight (%s)", input$year)
+    
+    plot <- grid_table %>%
       ggvis(x = ~population_density, y = ~nightlight) %>%
       add_axis("x", orient = "top", ticks = 0, title = country_name(),
                properties = axis_props(
@@ -236,9 +265,15 @@ shinyServer(function(input, output, session) {
                  labels = list(fontSize = 0))) %>%
       add_axis("x", title = "Population Density") %>%
       scale_numeric("x", nice = TRUE)  %>%
-      add_axis("y", title = "Nightlight") %>%
+      add_axis("y", title = ylabel) %>%
       scale_numeric("y", nice = TRUE)  %>%
       layer_points(stroke := "black", size = 0.2, fill = ~group) 
+
+    if (is.null(input$country) || input$country == "")
+      return(plot)
+      
+    plot %>% group_by(group) %>%
+      layer_model_predictions(model = "loess", se = TRUE, fill = ~group, stroke = ~group)
   }) %>%
   bind_shiny("plot")
   

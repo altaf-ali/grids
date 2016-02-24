@@ -7,6 +7,7 @@
 
 library(shiny)
 library(shinydashboard)
+library(shinysky)
 library(leaflet)
 library(ggvis)
 library(DT)
@@ -21,6 +22,7 @@ dashboard_sidebar <- dashboardSidebar(
     selectInput("country", label = "Country", choices = NULL),
     checkboxInput("map_click", label = "Clickable Map", value = FALSE),
     sliderInput("grid_scale", "Grid Scale", min = 1, max = 10, value = 1),
+    sliderInput("year", "Year", min = 1992, max = 2013, value = 1992, animate = TRUE),
     HTML("<footer>"),
     box(
       width = 12,
@@ -39,6 +41,7 @@ dashboard_body <- dashboardBody(
     tabItem(tabName = "menuitem_main",
       fluidRow(
         box(status = "success",
+            busyIndicator(text = "Updating ...", wait = 300),
             leafletOutput("map")
         ),
         box(status = "success", 
