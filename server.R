@@ -15,8 +15,9 @@ library(countrycode)
 library(DT)
 library(stringr)
 library(dplyr)
+library(nightlight)
 
-Default_Country <- "CHE"
+Default_Country <- "DZA"
 Working_Directory <- "~/Projects/koala"
 Zoom_Level <- 6
 
@@ -56,7 +57,7 @@ shinyServer(function(input, output, session) {
   
   progress$set(message = "Loading Night Lights dataset")
 
-  nightlight_data <- c()
+  nightlight_data <- nightlight_load("~/Datasets/noaa")
   
   load_nightlight_data <- function(nightlight_root) {
     folders <- data.frame(
@@ -81,7 +82,7 @@ shinyServer(function(input, output, session) {
     }
   }
   
-  load_nightlight_data("./datasets/noaa")
+  # load_nightlight_data()
 
   population_palette <- function() { "OrRd" }
   nightlight_palette <- function() { "Blues" }
@@ -123,7 +124,7 @@ shinyServer(function(input, output, session) {
     if (is.null(input$country) || input$country == "")
       return()
     
-    resample(masked_obj(nightlight_data[[input$year - 1992 + 1]]), population_obj())
+    raster::resample(masked_obj(nightlight_data[[input$year - 1992 + 1]]), population_obj())
   })
   
   groups_obj <- reactive({
@@ -256,7 +257,7 @@ shinyServer(function(input, output, session) {
   
   reactive({
     ylabel <- sprintf("Nightlight (%s)", input$year)
-    
+
     plot <- grid_table %>%
       ggvis(x = ~population_density, y = ~nightlight) %>%
       add_axis("x", orient = "top", ticks = 0, title = country_name(),
@@ -267,11 +268,11 @@ shinyServer(function(input, output, session) {
       scale_numeric("x", nice = TRUE)  %>%
       add_axis("y", title = ylabel) %>%
       scale_numeric("y", nice = TRUE)  %>%
-      layer_points(stroke := "black", size = 0.2, fill = ~group) 
+      layer_points(stroke := "black", size = 0.2, fill = ~group)
 
     if (is.null(input$country) || input$country == "")
       return(plot)
-      
+
     plot %>% group_by(group) %>%
       layer_model_predictions(model = "loess", se = TRUE, fill = ~group, stroke = ~group)
   }) %>%
